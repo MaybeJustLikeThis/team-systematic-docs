@@ -38,6 +38,13 @@ assert_eq "$(run_guard Write src/pay/refund/x.go)" "0" "BUILD 写 allowed 放行
 assert_eq "$(run_guard Write src/util/helper.go)" "0" "BUILD 写 extra 放行"
 assert_eq "$(run_guard Write src/other/y.go)" "2" "BUILD 写范围外拦"
 assert_eq "$(run_guard Write "$PWD/src/pay/refund/x.go")" "0" "BUILD 绝对路径在 allowed 放行"
+# mixed 盘符形式（Windows 原生 jq 的真实输出形态）
+MIXED_ROOT="$(cygpath -m "$PWD" 2>/dev/null || echo "$PWD")"
+if [ -n "$MIXED_ROOT" ] && [ "$MIXED_ROOT" != "$PWD" ]; then
+  assert_eq "$(run_guard Write "$MIXED_ROOT/src/pay/refund/x.go")" "0" "BUILD mixed 形式绝对路径在 allowed 放行"
+else
+  echo "  SKIP: 非 Windows 或无 cygpath，跳过 mixed 路径断言"
+fi
 # 8. CLOSE: 文档放行、知识候选放行、代码拦
 cp tests/fixtures/task-close.json .ai/task.json
 assert_eq "$(run_guard Write docs/api.md)" "0" "CLOSE 写 md 放行"
