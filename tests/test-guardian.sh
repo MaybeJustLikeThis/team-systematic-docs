@@ -32,5 +32,17 @@ assert_eq "$(run_guard Write .ai/plan/notes.md)" "0" "PLAN 写方案放行"
 assert_eq "$(run_guard Write .ai/memory/draft/MEM-x.md)" "0" "PLAN 写知识候选放行"
 assert_eq "$(run_guard Write src/pay/refund/handler.go)" "2" "PLAN 写业务代码被拦"
 
+# 7. BUILD: allowed 放行、extra 放行、范围外拦、绝对路径匹配
+cp tests/fixtures/task-build.json .ai/task.json
+assert_eq "$(run_guard Write src/pay/refund/x.go)" "0" "BUILD 写 allowed 放行"
+assert_eq "$(run_guard Write src/util/helper.go)" "0" "BUILD 写 extra 放行"
+assert_eq "$(run_guard Write src/other/y.go)" "2" "BUILD 写范围外拦"
+assert_eq "$(run_guard Write "$PWD/src/pay/refund/x.go")" "0" "BUILD 绝对路径在 allowed 放行"
+# 8. CLOSE: 文档放行、知识候选放行、代码拦
+cp tests/fixtures/task-close.json .ai/task.json
+assert_eq "$(run_guard Write docs/api.md)" "0" "CLOSE 写 md 放行"
+assert_eq "$(run_guard Write .ai/memory/draft/MEM-z.md)" "0" "CLOSE 写知识候选放行"
+assert_eq "$(run_guard Write src/pay/refund/x.go)" "2" "CLOSE 写代码拦"
+
 rm -f .ai/task.json
 summary

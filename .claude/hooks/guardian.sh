@@ -30,8 +30,17 @@ TARGET="$(echo "$INPUT" | jq -r '.tool_input.file_path // .tool_input.notebook_p
 [ -n "$TARGET" ] || { echo "GUARDIAN: 无法解析写入目标(fail-closed)" >&2; exit 2; }
 # 统一为正斜杠（防御 Windows 反斜杠路径绕过命门）
 TARGET="${TARGET//\\//}"
-# 绝对路径 -> 相对项目根
-REL="${TARGET#"$PWD"/}"
+# 绝对路径 -> 相对项目根。Windows 上 Claude Code 给的是盘符绝对路径
+# (如 D:/Mycase/.../x.go)，而 $PWD 在 MSYS/Git Bash 里是 POSIX 形式
+# (/d/Mycase/...)。两种根前缀都要剥一次，否则整路径漏判。
+# WINROOT = 盘符 mixed 形式(正斜杠)：/d/Mycase -> D:/Mycase
+WINROOT="$PWD"
+if command -v cygpath >/dev/null 2>&1; then
+  WINROOT="$(cygpath -m "$PWD" 2>/dev/null || echo "$PWD")"
+fi
+REL="$TARGET"
+REL="${REL#"$PWD"/}"
+REL="${REL#"$WINROOT"/}"
 REL="${REL:-$TARGET}"
 
 # 命门：task.json 对 AI 永远只读
