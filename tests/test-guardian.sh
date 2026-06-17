@@ -25,5 +25,12 @@ assert_eq "$(echo '{}' | bash "$GUARD" >/dev/null 2>&1; echo $?)" "2" "fail-clos
 # 4. 反斜杠路径也命中命门
 assert_eq "$(run_guard Write '.ai\task.json')" "2" "命门:反斜杠路径写 task.json 被拦"
 
+# 5. blocked 硬禁区：写 src/auth/ 被拦（fixture blocked_paths=["src/auth/"]）
+assert_eq "$(run_guard Write src/auth/login.go)" "2" "blocked 路径被拦"
+# 6. PLAN 白名单：写方案放行，写业务代码被拦
+assert_eq "$(run_guard Write .ai/plan/notes.md)" "0" "PLAN 写方案放行"
+assert_eq "$(run_guard Write .ai/memory/draft/MEM-x.md)" "0" "PLAN 写知识候选放行"
+assert_eq "$(run_guard Write src/pay/refund/handler.go)" "2" "PLAN 写业务代码被拦"
+
 rm -f .ai/task.json
 summary

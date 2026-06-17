@@ -42,4 +42,43 @@ case "$REL" in
 esac
 
 # Task 4 在此插入 stage 分支（PLAN/BUILD/CLOSE 白名单 + blocked）
-exit 0
+source .claude/scripts/lib-state.sh
+
+STAGE="$(state_get_stage "$TASK_FILE")"
+ALLOWED="$(state_get_scope allowed_paths "$TASK_FILE")"
+BLOCKED="$(state_get_scope blocked_paths "$TASK_FILE")"
+EXTRA="$(state_get_scope extra_grants "$TASK_FILE")"
+
+# 前缀匹配: 路径以任一前缀开头则命中（前缀来自 stdin，每行一个）
+matches_prefix() {  # path
+  local p="$1" pat
+  while IFS= read -r pat; do
+    [ -n "$pat" ] && [[ "$p" == "$pat"* ]] && return 0
+  done
+  return 1
+}
+
+# blocked 铁律: 全阶段生效
+if printf '%s\n' "$BLOCKED" | matches_prefix "$REL"; then
+  echo "GUARDIAN: $REL 在硬禁区(blocked)，不可修改，/extend 也放不了。" >&2
+  exit 2
+fi
+
+case "$STAGE" in
+  PLAN)
+    printf '%s\n' '.ai/plan/' '.ai/memory/draft/' | matches_prefix "$REL" && exit 0
+    echo "GUARDIAN: PLAN 阶段只能写方案(.ai/plan/)和知识候选(.ai/memory/draft/)。确认计划后用 /build 进入 BUILD。" >&2
+    exit 2 ;;
+  BUILD)
+    { printf '%s\n' "$ALLOWED"; printf '%s\n' "$EXTRA"; } | matches_prefix "$REL" && exit 0
+    echo "GUARDIAN: $REL 超出锁定范围。需要时用 /extend <path> 申请放行。" >&2
+    exit 2 ;;
+  CLOSE)
+    echo '.ai/memory/draft/' | matches_prefix "$REL" && exit 0
+    case "$REL" in *.md) exit 0 ;; esac
+    echo "GUARDIAN: CLOSE 阶段已冻结实现代码，只能写知识候选和文档。要改代码先 /build 退回。" >&2
+    exit 2 ;;
+  DONE|*)
+    echo "GUARDIAN: 任务已 DONE，无活动任务。新任务用 /lock。" >&2
+    exit 2 ;;
+esac
