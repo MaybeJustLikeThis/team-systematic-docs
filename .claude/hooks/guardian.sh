@@ -23,6 +23,8 @@ case "$TOOL_NAME" in
   Bash)
     CMD="$(echo "$INPUT" | jq -r '.tool_input.command // empty')"
     STAGE_B="$(jq -r '.stage' "$TASK_FILE")"
+    # fail-closed: stage 解析异常时阻断，与 Write 分支对称
+    [ -n "$STAGE_B" ] && [ "$STAGE_B" != "null" ] || { echo "GUARDIAN: Bash 阶段解析异常(fail-closed)" >&2; exit 2; }
     # BUILD/DONE 放行 bash（BUILD 允许写）
     case "$STAGE_B" in BUILD|DONE) exit 0 ;; esac
     # PLAN/CLOSE: 检测高危写命令。Bash 是否写文件不可靠判定，只做兜底弱约束。
