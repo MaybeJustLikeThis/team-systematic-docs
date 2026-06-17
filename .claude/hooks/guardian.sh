@@ -20,7 +20,17 @@ TOOL_NAME="$(echo "$INPUT" | jq -r '.tool_name // empty')"
 # 只拦截写类工具，其余放行
 case "$TOOL_NAME" in
   Write|Edit|NotebookEdit) ;;
-  Bash)  exit 0 ;;   # Bash 弱约束在 Task 6 接入
+  Bash)
+    CMD="$(echo "$INPUT" | jq -r '.tool_input.command // empty')"
+    STAGE_B="$(jq -r '.stage' "$TASK_FILE")"
+    # BUILD/DONE 放行 bash（BUILD 允许写）
+    case "$STAGE_B" in BUILD|DONE) exit 0 ;; esac
+    # PLAN/CLOSE: 检测高危写命令。Bash 是否写文件不可靠判定，只做兜底弱约束。
+    if echo "$CMD" | grep -qE '(^|[[:space:]])(rm|mv|cp|tee)([[:space:]]|$)|>|>>|sed[[:space:]].*-i'; then
+      echo "GUARDIAN: 当前 $STAGE_B 阶段不允许通过 Bash 改文件。需要写代码请先 /build。" >&2
+      exit 2
+    fi
+    exit 0 ;;
   *)     exit 0 ;;
 esac
 

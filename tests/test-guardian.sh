@@ -51,5 +51,19 @@ assert_eq "$(run_guard Write docs/api.md)" "0" "CLOSE 写 md 放行"
 assert_eq "$(run_guard Write .ai/memory/draft/MEM-z.md)" "0" "CLOSE 写知识候选放行"
 assert_eq "$(run_guard Write src/pay/refund/x.go)" "2" "CLOSE 写代码拦"
 
+# 工具: 跑 Bash 工具的 guardian
+run_guard_bash() {  # fixture_file  command  -> 退出码
+  cp "tests/fixtures/$1" .ai/task.json
+  local payload; payload=$(jq -nc --arg c "$2" '{tool_name:"Bash",tool_input:{command:$c}}')
+  echo "$payload" | bash "$GUARD" >/dev/null 2>&1; echo $?
+}
+
+# 9. PLAN 阶段高危 bash 被拦
+assert_eq "$(run_guard_bash task-plan.json 'rm src/x.go')" "2" "PLAN: rm 被拦"
+assert_eq "$(run_guard_bash task-plan.json 'sed -i s/a/b/ src/x.go')" "2" "PLAN: sed -i 被拦"
+assert_eq "$(run_guard_bash task-plan.json 'ls -la')" "0" "PLAN: 只读命令放行"
+# 10. BUILD 阶段 bash 放行（BUILD 允许写）
+assert_eq "$(run_guard_bash task-build.json 'rm src/pay/refund/x.go')" "0" "BUILD: bash 放行"
+
 rm -f .ai/task.json
 summary
