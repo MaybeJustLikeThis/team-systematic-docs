@@ -41,14 +41,26 @@ case "$REL" in
     exit 2 ;;
 esac
 
-# Task 4 在此插入 stage 分支（PLAN/BUILD/CLOSE 白名单 + blocked）
-source .claude/scripts/lib-state.sh
+# Task 4: stage 分支（PLAN/BUILD/CLOSE 白名单 + blocked）
+# 一次 jq 读回 stage + 三 scope（性能：原 source lib-state 后 4 次 jq 启动合并为 1 次）。
+# 字段用 ASCII 31(\x1f) 分隔，数组元素内部用 ASCII 30(\x1e) 分隔——两个控制字符都不会
+# 出现在路径里，也不含 \n，从而单次 read 即可完整取回多行数组(不丢元素)。
+SEP=$'\x1f'; INNER=$'\x1e'
+IFS="$SEP" read -r STAGE ALLOWED BLOCKED EXTRA < <(
+  jq -j --arg fs "$SEP" --arg is "$INNER" '
+    [.stage,
+     (.scope.allowed_paths//[]|join($is)),
+     (.scope.blocked_paths//[]|join($is)),
+     (.scope.extra_grants//[]|join($is))] | .[] | (. + $fs)
+  ' "$TASK_FILE"
+)
+# 数组内分隔符还原为换行，供 matches_prefix 逐行读
+ALLOWED="${ALLOWED//$INNER/$'\n'}"
+BLOCKED="${BLOCKED//$INNER/$'\n'}"
+EXTRA="${EXTRA//$INNER/$'\n'}"
 
-STAGE="$(state_get_stage "$TASK_FILE")"
-ALLOWED="$(state_get_scope allowed_paths "$TASK_FILE")"
-BLOCKED="$(state_get_scope blocked_paths "$TASK_FILE")"
-EXTRA="$(state_get_scope extra_grants "$TASK_FILE")"
-
+# 契约: allowed/blocked 路径必须以 / 结尾(目录前缀)，否则前缀匹配会过宽
+# (如 "src/pay/refund" 会误匹配 "src/pay/refundother")。task-lock.sh 写入时负责规范化。
 # 前缀匹配: 路径以任一前缀开头则命中（前缀来自 stdin，每行一个）
 matches_prefix() {  # path
   local p="$1" pat
