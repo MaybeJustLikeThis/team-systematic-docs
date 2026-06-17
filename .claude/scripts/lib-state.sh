@@ -17,23 +17,23 @@ state_get_gate() {  # key task_file -> true/false
 state_set_stage() {  # task_file stage  （原地改写）
   local f="$1" s="$2"
   local tmp; tmp="$(mktemp)"
-  jq --arg s "$s" '.stage = $s' "$f" > "$tmp" && mv "$tmp" "$f"
+  jq --arg s "$s" '.stage = $s' "$f" > "$tmp" && mv "$tmp" "$f" || { rm -f "$tmp"; return 1; }
 }
 
 state_set_gate() {  # task_file key value
   local f="$1" k="$2" v="$3"
   local tmp; tmp="$(mktemp)"
-  jq --arg k "$k" --argjson v "$v" '.gate[$k] = $v' "$f" > "$tmp" && mv "$tmp" "$f"
+  jq --arg k "$k" --argjson v "$v" '.gate[$k] = $v' "$f" > "$tmp" && mv "$tmp" "$f" || { rm -f "$tmp"; return 1; }
 }
 
 state_extend() {  # task_file path  （追加到 extra_grants）
   local f="$1" p="$2"
   local tmp; tmp="$(mktemp)"
-  jq --arg p "$p" '.scope.extra_grants += [$p]' "$f" > "$tmp" && mv "$tmp" "$f"
+  jq --arg p "$p" '.scope.extra_grants += [$p]' "$f" > "$tmp" && mv "$tmp" "$f" || { rm -f "$tmp"; return 1; }
 }
 
 state_clear_scope() {  # task_file  （清 allowed/blocked/extra，任务结束用）
   local f="$1"
   local tmp; tmp="$(mktemp)"
-  jq '.scope = {allowed_paths:[], blocked_paths:[], extra_grants:[]}' "$f" > "$tmp" && mv "$tmp" "$f"
+  jq '.scope = {allowed_paths:[], blocked_paths:[], extra_grants:[]}' "$f" > "$tmp" && mv "$tmp" "$f" || { rm -f "$tmp"; return 1; }
 }

@@ -19,4 +19,8 @@ assert_match "src/util/" "$(jq -rc '.scope.extra_grants[]' /tmp/t.json)" "追加
 state_clear_scope /tmp/t.json
 assert_eq "$(jq -rc '.scope.allowed_paths' /tmp/t.json)" "[]" "清空 scope"
 
+state_set_gate /tmp/t.json tests_passed true
+assert_eq "$(jq -r '.gate.tests_passed' /tmp/t.json)" "true" "写 gate"
+assert_eq "$(jq -rc '.gate.tests_passed | type' /tmp/t.json)" "boolean" "gate 保持布尔类型"
+
 summary
