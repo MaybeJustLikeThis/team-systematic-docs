@@ -64,6 +64,10 @@ assert_eq "$(run_guard_bash task-plan.json 'sed -i s/a/b/ src/x.go')" "2" "PLAN:
 assert_eq "$(run_guard_bash task-plan.json 'ls -la')" "0" "PLAN: 只读命令放行"
 # 10. BUILD 阶段 bash 放行（BUILD 允许写）
 assert_eq "$(run_guard_bash task-build.json 'rm src/pay/refund/x.go')" "0" "BUILD: bash 放行"
+# 11. BUILD 阶段 Bash 高危写命令撞 blocked -> best-effort 拦
+# task-build.json blocked_paths=["src/auth/"]
+assert_eq "$(run_guard_bash task-build.json 'rm src/auth/secret.go')" "2" "BUILD: rm 撞 blocked 被 best-effort 拦"
+assert_eq "$(run_guard_bash task-build.json 'rm src/pay/refund/x.go')" "0" "BUILD: rm allowed 范围放行"
 
 rm -f .ai/task.json
 summary

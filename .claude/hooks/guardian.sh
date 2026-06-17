@@ -25,12 +25,25 @@ case "$TOOL_NAME" in
     STAGE_B="$(jq -r '.stage' "$TASK_FILE")"
     # fail-closed: stage 解析异常时阻断，与 Write 分支对称
     [ -n "$STAGE_B" ] && [ "$STAGE_B" != "null" ] || { echo "GUARDIAN: Bash 阶段解析异常(fail-closed)" >&2; exit 2; }
-    # BUILD/DONE 放行 bash（BUILD 允许写）
-    case "$STAGE_B" in BUILD|DONE) exit 0 ;; esac
-    # PLAN/CLOSE: 检测高危写命令。Bash 是否写文件不可靠判定，只做兜底弱约束。
+    # DONE: 放行（scope 已清）
+    [ "$STAGE_B" = "DONE" ] && exit 0
+    # 检测高危写命令
     if echo "$CMD" | grep -qE '(^|[[:space:]])(rm|mv|cp|tee)([[:space:]]|$)|>|>>|sed[[:space:]].*-i'; then
-      echo "GUARDIAN: 当前 $STAGE_B 阶段不允许通过 Bash 改文件。需要写代码请先 /build。" >&2
-      exit 2
+      # PLAN/CLOSE: 一律拦
+      if [ "$STAGE_B" = "PLAN" ] || [ "$STAGE_B" = "CLOSE" ]; then
+        echo "GUARDIAN: 当前 $STAGE_B 阶段不允许通过 Bash 改文件。需要写代码请先 /build。" >&2
+        exit 2
+      fi
+      # BUILD: best-effort 检查命令是否疑似触碰 blocked（路径检测不可靠，挡明显情况）
+      if [ "$STAGE_B" = "BUILD" ]; then
+        BLOCKED_B="$(jq -r '.scope.blocked_paths[]?' "$TASK_FILE")"
+        while IFS= read -r b; do
+          if [ -n "$b" ] && echo "$CMD" | grep -qF -- "$b"; then
+            echo "GUARDIAN: BUILD 阶段 Bash 命令疑似触碰 blocked($b)，拒绝（Bash 路径检测不可靠，此为 best-effort）。" >&2
+            exit 2
+          fi
+        done <<< "$BLOCKED_B"
+      fi
     fi
     exit 0 ;;
   *)     exit 0 ;;

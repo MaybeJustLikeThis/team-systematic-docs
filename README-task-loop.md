@@ -20,6 +20,12 @@
 ## 命中硬禁区(blocked)怎么办
 不能放行。这是铁律。如 `src/auth/`、`infra/prod/` 这类，`/extend` 也拒绝。
 
+## 已知局限：Bash 弱约束
+guardian 对 Write/Edit/NotebookEdit 严格强制范围与 blocked 铁律。但 Bash 命令是否写文件不可靠判定，只做弱约束：
+- PLAN/CLOSE 阶段：高危写命令（rm/mv/cp/tee/>/>>/sed -i）一律拦
+- BUILD 阶段：高危写命令做 best-effort 检查，疑似触碰 blocked 则拦，但不保证捕获所有 Bash 写入（如 node/python 内嵌、dd、find -delete 等）
+真正的范围控制主要依赖 stage 门禁 + slash command。详见 spec §11。
+
 ## 依赖
 - jq（JSON 处理，Windows 用 scoop/winget 装）
 - Git Bash（Windows）
