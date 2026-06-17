@@ -13,15 +13,23 @@ mkdir -p .ai/memory/draft .ai/memory/active
 # 规范化路径前缀：统一正斜杠 + 强制以 / 结尾（目录前缀，guardian 前缀匹配契约）
 normalize_prefix() {
   local p="$1"
-  p="${p//\\//}"        # 反斜杠 -> 正斜杠
-  p="${p%/}"            # 去末尾斜杠
-  p="${p#/}"            # 去开头斜杠（相对路径）
+  p="${p//\\//}"                      # 反斜杠 -> 正斜杠
+  while [[ "$p" == */ ]]; do p="${p%/}"; done   # 去所有尾斜杠
+  while [[ "$p" == ./* ]]; do p="${p#./}"; done # 去 ./ 前缀
+  p="${p#/}"                          # 去开头斜杠
+  if [ -z "$p" ]; then
+    echo "task-lock: 无效路径 '$1'" >&2
+    return 1
+  fi
   printf '%s/' "$p"
 }
 
 ALLOWED_ARGS=()
 for arg in "$@"; do
-  ALLOWED_ARGS+=("$(normalize_prefix "$arg")")
+  if ! norm="$(normalize_prefix "$arg")"; then
+    exit 1
+  fi
+  ALLOWED_ARGS+=("$norm")
 done
 ALLOWED="$(printf '%s\n' "${ALLOWED_ARGS[@]}" | jq -R . | jq -s .)"
 
