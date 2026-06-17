@@ -1,0 +1,6 @@
+# 任务运行时状态，不入库
+.ai/task.json
+.ai/memory/draft/*
+!.ai/memory/draft/.gitkeep
+.ai/memory/active/*
+!.ai/memory/active/.gitkeep
