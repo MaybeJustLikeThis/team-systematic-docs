@@ -19,5 +19,11 @@ cp tests/fixtures/task-plan.json .ai/task.json
 assert_eq "$(run_guard Write .ai/task.json)" "2" "命门:写 task.json 被拦"
 assert_eq "$(run_guard Write /abs/.ai/task.json)" "2" "命门:绝对路径写 task.json 被拦"
 
+# 3. fail-closed: 解析异常时阻断（有任务前提下）
+assert_eq "$(echo '' | bash "$GUARD" >/dev/null 2>&1; echo $?)" "2" "fail-closed:空 stdin 拦"
+assert_eq "$(echo '{}' | bash "$GUARD" >/dev/null 2>&1; echo $?)" "2" "fail-closed:无 tool_name 拦"
+# 4. 反斜杠路径也命中命门
+assert_eq "$(run_guard Write '.ai\task.json')" "2" "命门:反斜杠路径写 task.json 被拦"
+
 rm -f .ai/task.json
 summary

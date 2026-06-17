@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -uo pipefail
+# no -e: 必须在 jq 失败后继续，靠 [-n] 空值检查兜底(fail-closed)
 # PreToolUse 守卫。读 stdin JSON，按 task.json 的 stage + scope 拦截写类工具。
 # 退出码: 0 放行, 2 阻断(stderr 反馈给 AI)。
 
@@ -27,6 +28,8 @@ esac
 TARGET="$(echo "$INPUT" | jq -r '.tool_input.file_path // .tool_input.notebook_path // empty')"
 # fail-closed: 写类工具但读不到目标路径，阻断
 [ -n "$TARGET" ] || { echo "GUARDIAN: 无法解析写入目标(fail-closed)" >&2; exit 2; }
+# 统一为正斜杠（防御 Windows 反斜杠路径绕过命门）
+TARGET="${TARGET//\\//}"
 # 绝对路径 -> 相对项目根
 REL="${TARGET#"$PWD"/}"
 REL="${REL:-$TARGET}"
